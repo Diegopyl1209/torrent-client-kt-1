@@ -2,7 +2,6 @@ package me.diegopyl
 
 import java.io.File
 import java.nio.charset.Charset
-import java.security.MessageDigest
 
 class TorrentFile(path: String) {
     private val charset = Charset.defaultCharset()
@@ -21,19 +20,13 @@ class TorrentFile(path: String) {
         announce = (torrentDic.value["announce"] as BencodeValue.BStringByte).value.toString(charset)
         infoDictionary = InfoDictionary((torrentDic.value["info"] as BencodeValue.BDictionary), charset)
         infoHash = sha1Hash(bencode.encode(infoDictionary.bencodeBDictionary))
-        infoHashString = infoHash.joinToString("") { str -> "%02x".format(str) }
+        infoHashString = infoHash.formatHexToString()
     }
 
     fun urlEncodeInfoHash(): String {
         // add % to every two characters
-        val ihash = infoHash.joinToString("") { "%02x".format(it) }
+        val ihash = infoHash.formatHexToString()
         return ihash.chunked(2).joinToString("") { "%$it" }
-    }
-
-    private fun sha1Hash(data: ByteArray): ByteArray {
-        val md = MessageDigest.getInstance("SHA-1")
-        val digest = md.digest(data)
-        return digest
     }
 
     /**
@@ -67,7 +60,7 @@ class TorrentFile(path: String) {
 
         private fun pieceHashes(pieces: ByteArray): List<String> {
             // from spec: string consisting of the concatenation of all 20-byte SHA1 hash values
-            return pieces.asIterable().chunked(20).map { it.joinToString("") { str -> "%02x".format(str) }  }
+            return pieces.asIterable().chunked(20).map { it.toByteArray().formatHexToString()  }
         }
     }
 }
