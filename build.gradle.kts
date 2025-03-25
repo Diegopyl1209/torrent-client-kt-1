@@ -16,6 +16,7 @@ dependencies {
     implementation("io.ktor:ktor-client-apache:$ktor_version")
     implementation("io.ktor:ktor-network:$ktor_version")
     implementation("org.slf4j:slf4j-nop:2.1.0-alpha1")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
 }
 
 tasks.test {

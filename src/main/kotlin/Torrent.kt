@@ -29,6 +29,7 @@ class Torrent(val torrentFile: TorrentFile) {
             append("&compact=", 1.toString())
         }
         val response = httpClient.get(uri)
+        println(response.bodyAsText())
         val responseDic = (bencode.decode(response.bodyAsBytes()) as BencodeValue.BDictionary).value
         val interval = responseDic["interval"]
         val peers = responseDic["peers"] as BencodeValue.BStringByte // each peer is represented using 6 bytes, 4 for host and 2 for port
