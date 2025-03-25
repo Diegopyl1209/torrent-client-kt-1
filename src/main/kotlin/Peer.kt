@@ -10,11 +10,15 @@ class Peer(
     private val ip: String,
     private val port: Int,
 ) {
+    private val BLOCK_SIZE = 16*1024L
+    private val currentBlockIndexDownloaded: MutableList<Boolean> = mutableListOf()
+
     private var socket: Socket? = null
     private var tx: ByteWriteChannel? = null
     private var rx: ByteReadChannel? = null
 
     var bitfield: List<Boolean>? = null
+    var chocked: Boolean = false
 
     suspend fun connect() {
         socket = aSocket(SelectorManager(Dispatchers.IO)).tcp().connect(ip, port)
@@ -53,8 +57,65 @@ class Peer(
         println(parsedBitfield)
     }
 
-    fun downloadPiece(index: Int): ByteArray? {
-        return null
+    suspend fun downloadPiece(index: Int): ByteArray {
+        if (tx == null || rx == null) {
+            throw IllegalStateException("Socket is closed")
+        }
+
+        // send interested
+        tx!!.writeInt(1)
+        tx!!.writeByte(2)
+
+        var blocksRequested = false
+        var blocksQuantity = 0
+        var blocksDownloaded = 0
+
+        var pieceDownloaded = byteArrayOf()
+
+        while(true) {
+            if (blocksQuantity in 1..blocksDownloaded) { // blocksDownloaded >= blocksQuantity
+                break
+            }
+            val messageLength = rx!!.readByte()
+            val messageId = rx!!.readByte()
+
+            when(messageLength) {
+                1.toByte() -> { // unchocke
+                    chocked = false
+
+                    if (!blocksRequested) {
+                        // request blocks for this piece index
+                        var offset = 0L
+                        while (offset < torrentFile.infoDictionary.pieceLength) {
+                            val size = if ((offset + BLOCK_SIZE) > torrentFile.infoDictionary.pieceLength) torrentFile.infoDictionary.pieceLength - offset else BLOCK_SIZE
+                            tx!!.writeInt(13)
+                            tx!!.writeByte(6)
+                            tx!!.writeInt(index)
+                            tx!!.writeInt(offset.toInt())
+                            tx!!.writeInt(size.toInt())
+                            offset+= size
+                            blocksQuantity++
+                        }
+                        blocksRequested = true
+                    }
+                }
+                7 .toByte() -> { // piece
+                    val pieceIndex = rx!!.readInt()
+                    val offset = rx!!.readInt()
+                    println("responded offset: $offset")
+                    //println("responded index: $pieceIndex")
+                    val block2 = rx!!.readByteArray(messageLength - 9)
+                    blocksDownloaded++
+                    pieceDownloaded += block2
+                }
+                0.toByte() -> { // chocked
+                    chocked = true
+                    println("Peer Chocked; current downloaded blocks of piece $index : $blocksDownloaded, total: $blocksQuantity")
+                }
+                else -> {}
+            }
+        }
+        return pieceDownloaded
     }
 
 
